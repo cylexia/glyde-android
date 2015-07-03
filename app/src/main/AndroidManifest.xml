@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.cylexia.mobile.glyde" >
+    package="com.cylexia.mobile.glyde">
+
+    <!-- version info's in the gradle build script -->
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -21,7 +23,8 @@
         </activity>
         <activity
             android:name="com.cylexia.mobile.glyde.LaunchActivity"
-            android:label="@string/title_activity_launch" >
+            android:label="@string/title_activity_launch"
+            android:configChanges="orientation">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

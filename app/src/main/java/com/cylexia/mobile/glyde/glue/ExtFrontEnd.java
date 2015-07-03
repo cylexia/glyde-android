@@ -1,11 +1,14 @@
 package com.cylexia.mobile.glyde.glue;
 
+import android.app.Application;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.widget.Toast;
 
 import com.cylexia.mobile.lib.glue.FileManager;
 import com.cylexia.mobile.lib.glue.Glue;
@@ -31,11 +34,14 @@ public class ExtFrontEnd implements Glue.Plugin {
 	private Map<String, ImageMap> resources;
 	private Map<String, Map<String, String>> styles;
 	private Map<String, Button> buttons;
+	private Map<String, String> keys;
+
 	private List<String> button_sequence;
 	private String action, action_params;
 	private String resume_label;
 
 	private String last_action_id;
+	private String last_error_msg;
 
 	private String window_title;
 	private int window_width;
@@ -137,7 +143,7 @@ public class ExtFrontEnd implements Glue.Plugin {
 			} else if( cmd.equals( "doaction" ) ) {
 				return doAction( wc, w );
 
-			} else if( cmd.equals( "clear" ) ) {
+			} else if( cmd.equals( "clear" ) || cmd.equals( "clearview" ) ) {
 				clearUI();
 
 			} else if( cmd.equals( "loadresource" ) ) {
@@ -153,6 +159,12 @@ public class ExtFrontEnd implements Glue.Plugin {
 
 			} else if( cmd.equals( "getlastactionid" ) ) {
 				vars.put( valueOf( w, "into" ), last_action_id );
+
+			} else if( cmd.equals( "onkey" ) ) {
+				if( keys == null ) {
+					keys = new HashMap<String, String>();
+				}
+				keys.put( wc, valueOf( w, "goto" ) );
 
 			} else if( cmd.equals( "drawas" ) ) {
 				drawAs( wc, w );
@@ -177,6 +189,38 @@ public class ExtFrontEnd implements Glue.Plugin {
 			return 1;
 		}
 		return 0;
+	}
+
+	public String tryKeyAction( int keycode, KeyEvent event ) {
+		if( keys == null ) {
+			return null;
+		}
+		String keyname;
+		switch( keycode ) {
+			case KeyEvent.KEYCODE_DPAD_UP:
+				keyname = "direction_up";
+				break;
+			case KeyEvent.KEYCODE_DPAD_LEFT:
+				keyname = "direction_left";
+				break;
+			case KeyEvent.KEYCODE_DPAD_DOWN:
+				keyname = "direction_down";
+				break;
+			case KeyEvent.KEYCODE_DPAD_RIGHT:
+				keyname = "direction_right";
+				break;
+			case KeyEvent.KEYCODE_DPAD_CENTER:
+			case KeyEvent.KEYCODE_BUTTON_A:
+				keyname = "direction_fire";
+				break;
+			default:
+				keyname = String.valueOf( keycode );
+				break;
+		}
+		if( keys.containsKey( keyname ) ) {
+			return keys.get( keyname );
+		}
+		return null;
 	}
 
 	public String getLabelForButtonAt( int x, int y ) {
@@ -247,6 +291,14 @@ public class ExtFrontEnd implements Glue.Plugin {
 		}
 	}
 
+	public String getLastErrorMessage() {
+		try {
+			return last_error_msg;
+		} finally {
+			this.last_error_msg = null;
+		}
+	}
+
 	/**
 	 * Add a definition to the (lazily created) styles map.  Note, the complete string is stored
 	 * so beware that keys like "_" and "f.setstyle" are added too
@@ -263,7 +315,7 @@ public class ExtFrontEnd implements Glue.Plugin {
 	private int setupView( Map<String, String> w ) {
 		if( w.containsKey( "backgroundcolour" ) ) {
 			this.background = new Paint();
-			background.setColor( Color.parseColor( w.get( "backgroundcolour" ) ) );
+			background.setColor( parseColour( w.get( "backgroundcolour" ) ) );
 			background.setStyle( Paint.Style.FILL_AND_STROKE );
 			plane.drawRect( 0, 0, plane.getWidth(), plane.getHeight(), background );
 		} else {
@@ -276,6 +328,7 @@ public class ExtFrontEnd implements Glue.Plugin {
 	private void clearUI() {
 		this.button_sequence = null;
 		this.buttons = null;
+		this.keys = null;
 		setSize( window_width, window_height );
 	}
 
@@ -291,67 +344,142 @@ public class ExtFrontEnd implements Glue.Plugin {
 		return ExtFrontEnd.GLUE_STOP_ACTION;		// expects labels to be DONE|ERROR|UNSUPPORTED
 	}
 
-	// TODO: this should use a rect and alignment options along with colour support
-	private int writeAs( String id, Map<String, String> args ) {
-		updateFromStyle( args );
-		String text = valueOf( args, "value" );
-		int x = intValueOf( args, "x", intValueOf( args, "atx" ) );
-		int y = intValueOf( args, "y", intValueOf( args, "aty" ) );
-		int size = intValueOf( args, "size", 2 );
-		int thickness = intValueOf( args, "thickness", 1 );
-		VecText v = VecText.getInstance();
-		int rw = intValueOf( args, "width", 0 );
-		int rh = intValueOf( args, "height", 0 );
-		int tw = (v.getGlyphWidth( size, thickness ) * text.length());
-		int th = v.getGlyphHeight( size, thickness );
-		int tx, ty;
-		if( rw > 0 ) {
-			String align = valueOf( args, "align", "2" );
-			if( align.equals( "2" ) || align.equals( "centre" ) ) {
-				tx = (x + ((rw - tw) / 2));
-			} else if( align.equals( "1" ) || align.equals( "right" ) ) {
-				tx = (x + (rw - tw));
+	private int createEntityAs( String id, Map<String, String> args ) {
+		/* param        used by     does
+		    value       text        the text value
+		    size        text
+		    thickness   text
+		    textcolour  text        text colour
+		    linecolour  rect        the border colour
+		    fillcolour  filledrect  the fill colour
+		    align       text        text alignment
+		*/
+
+		int rx = intValueOf( args, "x", intValueOf( args, "atx" ) );
+		int ry = intValueOf( args, "y", intValueOf( args, "aty" ) );
+		int rw = intValueOf( args, "width" );
+		int rh = intValueOf( args, "height" );
+ 		Rect rect = new Rect( rx, ry, (rx + rw), (ry + rh) );
+
+		// if we're given an ID or RESOURCE value, the width and height values will be replaced
+		//  with those of the resource
+		ImageMap resource = null;
+		String resid, imgid = null;
+		if( args.containsKey( "id" ) || args.containsKey( "resource" ) ) {
+			String rid = valueOf( args, "id", valueOf( args, "resource" ) );
+			if( resources == null ) {
+				return 0;
+			}
+			int b = rid.indexOf( '.' );
+			if( b > -1 ) {
+				resid = rid.substring( 0, b );
+				imgid = rid.substring( (b + 1) );
+				if( resources.containsKey( resid ) ) {
+					resource = resources.get( resid );    // imgmap: ExtGlyde.ImageMap
+					Rect resrect = resource.getRectWithId( imgid );
+					rect = new Rect(
+							rect.left,
+							rect.top,
+							(rect.left + resrect.width()),
+							(rect.top + resrect.height())
+					);
+				} else {
+					error( ("No such resource: " + resid) );
+					return 0;
+				}
 			} else {
+				error( ("Invalid resource: " + rid) );
+				return 0;
+			}
+		}
+
+		// filled rect first, then empty rect, resource and text
+		int d, x, y;
+		if( args.containsKey( "fillcolour" ) ) {
+			drawRect( rect, parseColour( valueOf( args, "fillcolour" ) ), true );
+		}
+		if( args.containsKey( "linecolour" ) ) {
+			drawRect( rect, parseColour( valueOf( args, "linecolour" ) ), false );
+		}
+
+		if( resource != null ) {
+			if( !resource.drawToCanvas( imgid, plane, rect.left, rect.top ) ) {
+				error( "[Glyde] Unable to draw resource" );
+				return 0;
+			}
+		}
+
+		String text = valueOf( args, "value", "" );
+		if( text.length() > 0 ) {
+			x = rect.left;
+			y = rect.top;
+			rw = rect.width();
+			rh = rect.height();
+			int size = intValueOf( args, "size", 2 );
+			int thickness = intValueOf( args, "thickness", 1 );
+			VecText v = VecText.getInstance();
+			int tw = (v.getGlyphWidth( size, thickness ) * text.length());
+			int th = v.getGlyphHeight( size, thickness );
+			int tx, ty;
+			if( rw > 0 ) {
+				String align = valueOf( args, "align", "2" );
+				if( align.equals( "2" ) || align.equals( "centre" ) ) {
+					tx = (x + ((rw - tw) / 2));
+				} else if( align.equals( "1" ) || align.equals( "right" ) ) {
+					tx = (x + (rw - tw));
+				} else {
+					tx = x;
+				}
+			} else {
+				rw = tw;
 				tx = x;
 			}
-		} else {
-			rw = tw;
-			tx = x;
+			if( rh > 0 ) {
+				ty = (y + ((rh - th) / 2));
+			} else {
+				rh = th;
+				ty = y;
+			}
+			int clr = parseColour( valueOf( args, "textcolour", "#000" ) );
+			v.drawString( plane, text, clr, tx, ty, size, thickness, (thickness + 1) );
+			// if w/h were 0 then replace with the text w/h
+			rect = new Rect( x, y, (x + rw), (y + rh) );
 		}
-		if( rh > 0 ) {
-			ty = (y + ((rh - th) / 2));
+		return buttonise( id, rect.left, rect.top, rect.width(), rect.height(), args );
+	}
+
+	private void drawRect( Rect r, int clr, boolean filled ) {
+		Paint p = new Paint();
+		p.setColor( clr );
+		p.setStrokeWidth( 1 );
+		if( filled ) {
+			p.setStyle( Paint.Style.FILL_AND_STROKE );
 		} else {
-			rh = th;
-			ty = y;
+			p.setStyle( Paint.Style.STROKE );
 		}
-		v.drawString( plane, text, Color.BLACK, tx, ty, size, thickness, (thickness + 1) );
-		return buttonise( id, x, y, rw, rh, args );
+		plane.drawRect( r.left, r.top, r.right, r.bottom, p );
+	}
+
+	private void error( String msg ) {
+		this.last_error_msg = msg;
+	}
+
+	// TODO: this should use a rect and alignment options along with colour support
+	private int writeAs( String id, Map<String, String> args ) {
+		applyStyle( args );
+		if( !args.containsKey( "textcolour" ) ) {
+			args.put( "textcolour", valueOf( args, "colour" ) );
+		}
+		return createEntityAs( id, args );
 	}
 
 	private int drawAs( String id, Map<String, String> args ) {
-		updateFromStyle( args );
-		int x = intValueOf( args, "x", intValueOf( args, "atx" ) );
-		int y = intValueOf( args, "y", intValueOf( args, "aty" ) );
-		String rid = valueOf( args, "id", valueOf( args, "resource" ) );
-		if( resources != null ) {
-			int b = rid.indexOf( '.' );
-			if( b > -1 ) {
-				String resid = rid.substring( 0, b );
-				String imgid = rid.substring( (b + 1) );
-				if( resources.containsKey( resid ) ) {
-					ImageMap m = resources.get( resid );
-					if( m.drawToCanvas( imgid, plane, x, y ) ) {
-						Rect r = m.getRectWithId( imgid );
-						return buttonise( id, x, y, r.width(), r.height(), args );
-					}
-				}
-			}
-		}
-		return 0;
+		applyStyle( args );
+		return createEntityAs( id, args );
 	}
 
 	private int markAs( String id, Map<String, String> args ) {
-		updateFromStyle( args );
+		applyStyle( args );
 		return buttonise(
 				id,
 				intValueOf( args, "x", intValueOf( args, "atx" ) ),
@@ -363,21 +491,16 @@ public class ExtFrontEnd implements Glue.Plugin {
 	}
 
 	private int paintRectAs( String id, Map<String, String> args, boolean filled ) {
-		updateFromStyle( args );
-		int x = intValueOf( args, "x", intValueOf( args, "atx" ) );
-		int y = intValueOf( args, "y", intValueOf( args, "aty" ) );
-		int w = intValueOf( args, "width" );
-		int h = intValueOf( args, "height" );
-		Paint p = new Paint();
-		p.setColor( Color.parseColor( valueOf( args, "colour" ) ) );
-		p.setStrokeWidth( 1 );
-		if( filled ) {
-			p.setStyle( Paint.Style.FILL_AND_STROKE );
-		} else {
-			p.setStyle( Paint.Style.STROKE );
+		applyStyle( args );
+		if( !args.containsKey( "linecolour" ) ) {
+			args.put( "linecolour", valueOf( args, "colour", "#000" ) );
 		}
-		plane.drawRect( x, y, (x + w), (y + h), p );
-		return buttonise( id, x, y, w, h, args );
+		if( filled ) {
+			if( !args.containsKey( "fillcolour" ) ) {
+				args.put( "fillcolour", valueOf( args, "colour", "#000" ) );
+			}
+		}
+		return createEntityAs( id, args );
 	}
 
 	private int buttonise( String id, int x, int y, int w, int h, Map<String, String> args ) {
@@ -385,7 +508,7 @@ public class ExtFrontEnd implements Glue.Plugin {
 			Paint p = new Paint();
 			p.setStrokeWidth( 1 );
 			// TODO: illegal colours (#xxx) throw an exception.  this needs to be sorted for all parseColour instances
-			p.setColor( Color.parseColor( valueOf( args, "border" ) ) );
+			p.setColor( parseColour( valueOf( args, "border" ) ) );
 			p.setStyle( Paint.Style.STROKE );
 			plane.drawRect( x, y, (x + w), (y + h), p );
 		}
@@ -409,7 +532,7 @@ public class ExtFrontEnd implements Glue.Plugin {
 		return 0;
 	}
 
-	private void updateFromStyle( Map<String, String> a ) {
+	private void applyStyle(Map<String, String> a) {
 		if( styles == null ) {
 			return;
 		}
@@ -468,6 +591,30 @@ public class ExtFrontEnd implements Glue.Plugin {
 			return w.get( k );
 		} else {
 			return def;
+		}
+	}
+
+	private static int parseColour( String clr ) {
+		if( (clr == null) || (clr.length() == 0) ) {
+			return Color.BLACK;
+		}
+		try {
+			return Color.parseColor( clr );
+		} catch( IllegalArgumentException ex ) {
+			if( (clr.length() == 4) && (clr.charAt( 0 ) == '#') ) {
+				StringBuilder nclr = new StringBuilder( 7 );
+				nclr.append( '#' );
+				nclr.append( clr.charAt( 1 ) ).append( clr.charAt( 1 ) );
+				nclr.append( clr.charAt( 2 ) ).append( clr.charAt( 2 ) );
+				nclr.append( clr.charAt( 3 ) ).append( clr.charAt( 3 ) );
+				try {
+					return Color.parseColor( nclr.toString() );
+				} catch( IllegalArgumentException ex2 ) {
+					return Color.BLACK;
+				}
+			} else {
+				return Color.BLACK;
+			}
 		}
 	}
 

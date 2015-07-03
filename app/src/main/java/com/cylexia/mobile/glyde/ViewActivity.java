@@ -86,14 +86,16 @@ public class ViewActivity extends AppCompatActivity {
 						Bitmap bitmap = FileManager.getInstance( this ).getBitmap( icon );
 						BitmapDrawable bmpd = new BitmapDrawable( getResources(), bitmap );
 						if( bitmap != null ) {
-							getSupportActionBar().setIcon( bmpd );
+							if( getSupportActionBar() != null ) {
+								getSupportActionBar().setIcon( bmpd );
+							}
 						}
 					} catch( Exception ex ) {
 						Log.e( "ViewInit", ("SetActivityIcon: " + ex.toString()) );
 						// just ignore it
 					}
 				}
-			} else {
+			//} else {
 				// we should never be here (actually, if we ever implement the idea of adding
 				// shortcuts to the app list we may launch directly and need to decode that
 				// here
@@ -165,6 +167,12 @@ public class ViewActivity extends AppCompatActivity {
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
+	}
+
+	@Override
+	public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+		// TODO: deal with this
+		super.onConfigurationChanged( newConfig );
 	}
 
 	public void runScriptAndSync( String label ) {

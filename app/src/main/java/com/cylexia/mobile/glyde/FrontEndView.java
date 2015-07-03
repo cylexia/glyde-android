@@ -5,6 +5,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.support.annotation.NonNull;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -39,7 +40,7 @@ public class FrontEndView extends ImageView implements View.OnClickListener {
     }
 
     @Override
-    protected void onDraw( Canvas canvas ) {
+    protected void onDraw( @NonNull Canvas canvas ) {
 		super.onDraw(canvas);
     }
 
@@ -102,6 +103,11 @@ public class FrontEndView extends ImageView implements View.OnClickListener {
 
 	private boolean handleKeyEvent( int keyCode, KeyEvent event, boolean repeat ) {
 		if( (event.getAction() == KeyEvent.ACTION_UP) || repeat ) {
+			String label = ext.tryKeyAction( keyCode, event );
+			if( label != null ) {
+				view.runScriptAndSync( label );
+				return true;
+			}
 			switch( keyCode ) {
 				case KeyEvent.KEYCODE_DPAD_UP:
 				case KeyEvent.KEYCODE_DPAD_LEFT:
