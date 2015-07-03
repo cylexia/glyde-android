@@ -20,6 +20,7 @@ import android.widget.Toast;
 import com.cylexia.mobile.lib.glue.FileManager;
 import com.cylexia.mobile.lib.glue.Glue;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -72,7 +73,7 @@ public class ViewActivity extends AppCompatActivity {
 			this.variables = Glue.partsToMap( savedInstanceState.getString( STORE_VARIABLES ) );
 		} else {
 			Intent launch = getIntent();
-			if( launch != null ) {
+			if( (launch != null) && launch.hasExtra( STORE_SCRIPT ) ) {
 				this.script = launch.getStringExtra( STORE_SCRIPT );
 				String vars = launch.getStringExtra( STORE_VARIABLES );
 				if( (vars != null) && !vars.isEmpty() ) {
@@ -95,13 +96,40 @@ public class ViewActivity extends AppCompatActivity {
 						// just ignore it
 					}
 				}
-			//} else {
+			} else {
 				// we should never be here (actually, if we ever implement the idea of adding
 				// shortcuts to the app list we may launch directly and need to decode that
 				// here
+				AppResource resource;
+				try {
+					resource = new AppResource( FileManager.getInstance( this ), Configuration.STANDALONE_APP_FILE );
+					resource.configureForLaunch();            // setup root path and such
+
+					this.script = resource.getScript();
+					this.variables = resource.getVariables();
+					if( variables == null ) {
+						this.variables = new HashMap<String, String>();
+					}
+					Bitmap icon = resource.getIcon();
+					if( icon != null ) {
+						try {
+							BitmapDrawable bmpd = new BitmapDrawable( getResources(), icon );
+							if( icon != null ) {
+								if( getSupportActionBar() != null ) {
+									getSupportActionBar().setIcon( bmpd );
+								}
+							}
+						} catch( Exception ex ) {
+							Log.e( "ViewInit", ("SetActivityIcon: " + ex.toString()) );
+							// just ignore it
+						}
+					}
+				} catch( IOException ex ) {
+					Toast.makeText( this, "Unable to start", Toast.LENGTH_LONG ).show();
+					return;
+				}
 			}
 		}
-
 
 		// TODO: setup the Glue object
 		this.runtime = Glue.init( this );
@@ -110,21 +138,17 @@ public class ViewActivity extends AppCompatActivity {
 		runtime.attachPlugin( ext_frontend );
 
 		// attach executables
+		// -v- CUSTOMISE -v-
+		//  Add or remove entries here according to what your script(s) need
 		runtime.addExecutable( "ui", new UI( this ) );
 		runtime.addExecutable( "wget", new Wget( this ) );
 		runtime.addExecutable( "hashcode", new HashCode() );
+		// -^- CUSTOMISE -^-
 
 		this.mainView = new FrontEndView( this, ext_frontend );
 		l.addView( mainView );
 
 		// TODO: use a "launcher" screen to invoke this view so script will never be null as the launcher will provide one
-		if( script == null ) {
-			try {
-				script = FileManager.getInstance( this ).readFromFile( "#test.script" );
-			} catch( Exception ex ) {
-				Toast.makeText( this, "Unable to load script", Toast.LENGTH_SHORT ).show();
-			}
-		}
 
 		if( (script != null) && !script.isEmpty() ) {
 			runtime.load( script );
