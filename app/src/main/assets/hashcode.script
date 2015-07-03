@@ -1,0 +1,35 @@
+f.setWidth 500 height 200
+f.setTitle "Hash Code"
+
+gosub :SHOW_UI
+stop
+
+:SHOW_UI
+    f.clear "view"
+    f.paintFilledRectAs "start_bg" x 5 y 5 width 490 height 30 colour "#aaffaa"
+    f.writeAs "start" x 5 y 5 width 490 height 30 value "Generate Hash" onClickGoto :START border "#00aa00"
+    return
+
+
+:START
+    platform.exec "ui" withArgs "ask -prompt \qString to hash\q -file temp.txt -ok Hash" onDoneGoto :HASH onErrorGoto :FAIL
+    stop
+
+:HASH
+    V = platform.readFromFile "temp.txt"
+    ARGS = join "\q" & V && "\q -o temp.txt"
+    platform.exec "hashcode" withArgs ARGS onDoneGoto :DONE onErrorGoto :FAIL
+    stop
+
+:DONE
+    gosub :SHOW_UI
+    V = platform.readFromFile "temp.txt"
+    V = join "Hash: " & V
+    f.writeAs 0 value V x 5 y 40
+    stop
+
+
+:FAIL
+    gosub :SHOW_UI
+    f.writeAs 0 value "Failed" x 5 y 40
+    stop
