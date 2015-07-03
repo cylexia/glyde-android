@@ -1,6 +1,5 @@
 package com.cylexia.mobile.glyde.glue;
 
-import android.app.Application;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -8,7 +7,6 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.util.Log;
 import android.view.KeyEvent;
-import android.widget.Toast;
 
 import com.cylexia.mobile.lib.glue.FileManager;
 import com.cylexia.mobile.lib.glue.Glue;
@@ -24,7 +22,7 @@ import com.cylexia.mobile.glyde.VecText;
 /**
  * Created by sparx104 on 27/04/2015.
  */
-public class ExtFrontEnd implements Glue.Plugin {
+public class ExtGlyde implements Glue.Plugin {
 	public static final int GLUE_STOP_ACTION = -200;
 
 	private final FileManager filemanager;
@@ -49,7 +47,7 @@ public class ExtFrontEnd implements Glue.Plugin {
 
 	private Paint background;
 
-	public ExtFrontEnd( FileManager fm ) {
+	public ExtGlyde(FileManager fm) {
 		super();
 		this.filemanager = fm;
 	}
@@ -341,7 +339,7 @@ public class ExtFrontEnd implements Glue.Plugin {
 		b.append( valueOf( w, "onerrorgoto", done_label ) ).append( "\t" );
 		b.append( valueOf( w, "onunsupportedgoto", done_label ) );
 		this.resume_label = b.toString();
-		return ExtFrontEnd.GLUE_STOP_ACTION;		// expects labels to be DONE|ERROR|UNSUPPORTED
+		return ExtGlyde.GLUE_STOP_ACTION;		// expects labels to be DONE|ERROR|UNSUPPORTED
 	}
 
 	private int createEntityAs( String id, Map<String, String> args ) {

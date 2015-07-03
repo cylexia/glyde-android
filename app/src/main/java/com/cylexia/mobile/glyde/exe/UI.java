@@ -1,4 +1,4 @@
-package com.cylexia.mobile.glyde.glue;
+package com.cylexia.mobile.glyde.exe;
 
 import android.content.Context;
 import android.content.DialogInterface;
@@ -9,6 +9,7 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.cylexia.mobile.glyde.glue.ExtGlyde;
 import com.cylexia.mobile.lib.glue.FileManager;
 import com.cylexia.mobile.lib.glue.Glue;
 
@@ -31,7 +32,7 @@ public class UI implements Glue.Executable {
 	}
 
 	@Override
-	public int exec( Context context, String name, String args, String label ) {
+	public int exec( Glue glue, Context context, String name, String args, String label ) {
 		// ui ask -prompt -value -file
 		// ui choose -prompt -items -file
 
@@ -47,7 +48,7 @@ public class UI implements Glue.Executable {
 		} else if( cmd.equals( "choose" ) ) {
 			choose( context, a );
 		}
-		return ExtFrontEnd.GLUE_STOP_ACTION;
+		return ExtGlyde.GLUE_STOP_ACTION;
 	}
 
 	private void ask( Context context, Map<String, String> args ) {

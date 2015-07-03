@@ -1,4 +1,4 @@
-package com.cylexia.mobile.glyde.glue;
+package com.cylexia.mobile.glyde.exe;
 
 import android.content.Context;
 import android.os.Handler;
@@ -35,7 +35,7 @@ public class Wget implements Glue.Executable {
 	}
 
 	@Override
-	public int exec( Context c, String name, String args, String label ) {
+	public int exec( Glue glue, Context c, String name, String args, String label ) {
 		this.on_done_label = label;
 		this.callback = new Handler( Looper.getMainLooper() );
 

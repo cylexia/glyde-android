@@ -36,10 +36,17 @@ import java.util.Stack;
  */
 public class Glue {
     /*********************************************************************/
-    public final static String VERSION = "1.6.150423";
-    /*********************************************************************/
+    public final static String VERSION = "1.6.150703";
+	/*********************************************************************/
 
-    private final ArrayList<Plugin> plugins;
+	public final static int PLUGIN_DONE = 1;
+	public final static int PLUGIN_NOT_MINE = -1;
+	public final static int PLUGIN_INLINE_REDIRECT = -2;      // call setRedirectLabel() to set the label
+	public final static int PLUGIN_DONE_STOP_OK = -3;
+	public final static int PLUGIN_DONE_EXIT_ALL = -254;
+	/*********************************************************************/
+
+	private final ArrayList<Plugin> plugins;
 	private Map<String, Executable> executables;
     private OutputStream stdout;
     private boolean kill;
@@ -47,6 +54,7 @@ public class Glue {
     private File platformPath;
     private Map<String, Integer> markerLineCache;
 	private List<String> scriptLines;			// TODO: as lines are parsed the raw tokens should be stored per line for variable replacement later
+	private Map<String, String> loaded_vars;
 	private String last_error;
 	private String extra_error_info;
 	private String redirect_label;
@@ -193,7 +201,8 @@ public class Glue {
         echo( "Glue v" ).echo( VERSION ).echo( " [android]\n(c)2013-14 by Cylexia\n\n" );
     }
 
-	public void load( String script ) {
+	public void load( String script, Map<String, String> vars ) {
+		this.loaded_vars = vars;
 		String[] lines = script.split( "\n" );		// TODO: replace with basic style parser which doesn't need the lines
 		String line;
 		int i, l = lines.length;
@@ -207,12 +216,13 @@ public class Glue {
 		}
 	}
 
-    public int run( Map<String, String> vars ) {
-        return run( vars, null );
+    public int run() {
+		return run( null );
     }
 
-    public int run( Map<String, String> vars, String startlbl ) {
-        this.kill = false;
+    public int run( String startlbl ) {
+		Map<String, String> vars = loaded_vars;
+		this.kill = false;
         String label = "", ts = "";
         Stack<Integer> gss = new Stack<Integer>();
         Stack<String> gsp = new Stack<String>();
@@ -260,12 +270,12 @@ public class Glue {
                     if( c.equals( "value" ) || c.equals( "@" ) || c.equals( "put" ) ) {
 						Dict.setInto( vars, w, Dict.valueOf( w, c ) );
 					} else if( c.equals( "get@" ) ) {
-						Dict.setInto( vars, w, Dict.valueOf( w, Dict.valueOf( w, c ) ) );
+						Dict.setInto( vars, w, Dict.valueOf( vars, Dict.valueOf( w, c ) ) );
 
 					} else if( c.equals( "setpart" ) ) {
 						Dict.setInto( vars, w, Glue._setPart( Dict.valueOf( w, "in" ), Dict.valueOf( w, c ), Dict.valueOf( w, "to" ) ) );
-					} else if( c.equals( "setparts" ) ) {
-						Dict.setInto( vars, w, Glue._setParts( Dict.valueOf( w, "in" ), Dict.rootValue( w ), w ) );
+					//} else if( c.equals( "setparts" ) ) {
+					//	Dict.setInto( vars, w, Glue._setParts( Dict.valueOf( w, "in" ), Dict.rootValue( w ), w ) );
 					} else if( c.equals( "getpart" ) ) {
 						Dict.setInto( vars, w, Glue._getPart( Dict.valueOf( w, "from" ), Dict.rootValue( w ) ) );
 					} else if( c.equals( "getparts" ) || c.equals( "extractparts" ) ) {
@@ -295,16 +305,15 @@ public class Glue {
 							_error( "RETURN without GOSUB" );
 						}
 					} else if( c.equals( "while" ) ) {
-						if( Dict.intValueOf( w, c ) != 0 ) {
+						if( Dict.boolValueOf( w, c ) ) {
 							label = Dict.valueOf( w, "goto" );
 							i = -1;
 						}
 					} else if( c.equals( "until" ) ) {
-						if( Dict.intValueOf( w, c ) == 0 ) {
+						if( !Dict.boolValueOf( w, c )  ) {
 							label = Dict.valueOf( w, "goto" );
 							i = -1;
 						}
-						break;
 					} else if( c.equals( "+++" ) ) {
 						// NOTE: interactive mode is not available
 
@@ -332,8 +341,14 @@ public class Glue {
 					} else if( c.equals( "cutrightof" ) || c.equals( "cropleftoffof" ) ) {
 						Dict.setInto( vars, w, Dict.valueOf( w, c ).substring( Dict.intValueOf( w, "at", 0 ) ) );
 					} else if( c.equals( "findindexof" ) ) {
-							Dict.setInto( vars, w, String.valueOf( Dict.valueOf( w, "in" ).indexOf( Dict.valueOf( w, c ) ) ) );
-                        } else if( c.equals( "getlengthof" ) ) {
+						int ps;
+						if( Dict.boolValueOf( w, "ignorecase" ) ) {
+							ps = Dict.valueOf( w, "in" ).toLowerCase().indexOf( Dict.valueOf( w, c ).toLowerCase() );
+						} else {
+							ps = Dict.valueOf( w, "in" ).indexOf( Dict.valueOf( w, c ) );
+						}
+						Dict.setInto( vars, w, String.valueOf( ps ) );
+					} else if( c.equals( "getlengthof" ) ) {
 						Dict.setInto( vars, w, String.valueOf( Dict.valueOf( w,c ).length() ) );
 
 					} else if( c.equals(  "" ) ) {
@@ -343,12 +358,12 @@ public class Glue {
                             if( line.charAt( 0 ) != ':' ) {
                                 for( int pi = 0, pl = plugins.size(); pi < pl; pi++ ) {
                                     int r = plugins.get( pi ).glueCommand( this, w, vars );
-                                    if( r == 1 ) {			// handled
+                                    if( r == PLUGIN_DONE ) {			// handled
                                         handled = true;
                                         break;
-                                    } else if( r == -1 ) {    // not this plugin's
+                                    } else if( r == PLUGIN_NOT_MINE ) {    // not this plugin's
 										//
-									} else if( r == -2 ) {
+									} else if( r == PLUGIN_INLINE_REDIRECT ) {
 										// redirect to the label in setRedirectLabel()
 										label = this.redirect_label;
 										if( label != null ) {
@@ -560,34 +575,25 @@ public class Glue {
         return Glue._part( d, sk, sv, 1 );
     }
 
-    /**
-     * Set several parts in a dictionary at once.  The specified list of keys can be capitalised but will be converted to
-     * lower case for reading from the source map
-     * @param d the dictionary
-     * @param klist the list of keys to set separated with "/"'s
-     * @param src the map containing the data to read from
-     * @return the updated dictionary
-     */
-    private static String _setParts( String d, String klist, Map<String, String> src ) {
-        String k;
-        int s = 0, e;
-        while( (e = klist.indexOf( ',', s )) > -1 ) {
-            k = klist.substring( s, e );
-            d = _setPart( d, k, Dict.valueOf( src, k.toLowerCase(), "" ) );
-            s = (e + 1);
-        }
-        k = klist.substring( s );
-        return _setPart( d, k, Dict.valueOf( src, k.toLowerCase(), "" ) );
-//		int s, e = (klist.length() - 1);
-//		String k;
-//		while( (s = klist.lastIndexOf( '/', e )) > -1 ) {
-//			k = klist.substring( (s + 1), (e + 1) );
-//			d = _setPart( d, k, Dict.valueOf( src, k.toLowerCase(), "" ) );
-//			e = (s - 1);
-//		}
-//		k = klist.substring( 0, (e + 1) );
-//		return _setPart( d, k, Dict.valueOf( src, k.toLowerCase(), "" ) );
-    }
+//    /**
+//     * Set several parts in a dictionary at once.  The specified list of keys can be capitalised but will be converted to
+//     * lower case for reading from the source map
+//     * @param d the dictionary
+//     * @param klist the list of keys to set separated with "/"'s
+//     * @param src the map containing the data to read from
+//     * @return the updated dictionary
+//     */
+//    private static String _setParts( String d, String klist, Map<String, String> src ) {
+//        String k;
+//        int s = 0, e;
+//        while( (e = klist.indexOf( ',', s )) > -1 ) {
+//            k = klist.substring( s, e );
+//            d = _setPart( d, k, Dict.valueOf( src, k.toLowerCase(), "" ) );
+//            s = (e + 1);
+//        }
+//        k = klist.substring( s );
+//        return _setPart( d, k, Dict.valueOf( src, k.toLowerCase(), "" ) );
+//    }
 
     /**
      * Get a named part from a dictionary
@@ -673,7 +679,7 @@ public class Glue {
     private static String _getParts( String d, String klist ) {
         String k, nm = "";
         int s = 0, e;
-        while( (e = klist.indexOf( '/', s )) > -1 ) {
+        while( (e = klist.indexOf( ',', s )) > -1 ) {
             k = klist.substring( s, e );
             nm = Glue._setPart( nm, k, _getPart( d, k ) );
             s = (e + 1);
@@ -1012,7 +1018,7 @@ public class Glue {
 							if( Glue.this.executables.containsKey( wc ) ) {
 								Executable e = Glue.this.executables.get( wc );
 								int rescode = e.exec(
-										currentContext, wc,
+										glue, currentContext, wc,
 										Dict.valueOf( w, "args", Dict.valueOf( w, "withargs" ) ),
 										Dict.valueOf( w, "ondonegoto" )
 									);
@@ -1255,13 +1261,14 @@ public class Glue {
 	public interface Executable {
 		/**
 		 * Called by platform.exec to simulate execution
+         * @param glue The Glue instance for access to setRedirectLabel and run
 		 * @param context The current context Glue is aware of.  Maybe null and may not be the visible context
 		 * @param name the name this was executed under
 		 * @param args arguments as a string
 		 * @param label the label to go to once execution is complete if returning a value < 0
 		 * @return ignored if 0 or above, if <0 the plugin will return the value for event handling by the (expected!) runloop
 		 */
-		public int exec( Context context, String name, String args, String label );
+		public int exec( Glue glue, Context context, String name, String args, String label );
 	}
 
 //	private static class CompiledNode {
