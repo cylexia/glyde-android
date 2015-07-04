@@ -828,43 +828,7 @@ public class Glue {
             String c = Dict.valueOf( w, "_" );
             String r;
             int v;
-            if( c.equals( "eval" ) ) {
-                v = Dict.intValueOf( w, c );
-                if( w.containsKey( "+" ) ) {
-                    v = (v + Dict.intValueOf( w, "+" ));
-                } else if( w.containsKey( "-" ) ) {
-                    v = (v - Dict.intValueOf( w, "-" ));
-                } else if( w.containsKey( "/" ) ) {
-                    v = (v / Dict.intValueOf( w, "/" ));
-                } else if( w.containsKey( "*" ) ) {
-                    v = (v * Dict.intValueOf( w, "*" ));
-                } else if( w.containsKey( "%" ) ) {
-                    v = (v % Dict.intValueOf( w, "%" ));
-                } else {
-                    r = Dict.valueOf( w, c );
-                    if( w.containsKey( "&" ) ) {
-                        String k = "&";
-                        while( w.containsKey( k ) ) {
-                            r += Dict.valueOf( w, k );
-                            k += "&";
-                        }
-                    } else if( Dict.containsKey( w, "$" ) ) {
-                        int p = Dict.intValueOf( w, "$" );
-                        if( p == -1 ) {
-                            r = String.valueOf( Dict.valueOf( w, c ).length() );
-                        } else {
-                            r = String.valueOf( new char[] { Dict.valueOf( w, c ).charAt( p ) } );
-                        }
-                    } else {
-                        // invalid operator
-                        return 0;
-                    }
-                    Dict.setInto( vars, w, r );
-                    return 1;
-                }
-                Dict.setInto( vars, w, String.valueOf( v ) );
-                return 1;
-            } else if( c.equals( "testif" ) || c.equals( "testifnot" ) ) {
+            if( c.equals( "testif" ) || c.equals( "testifnot" ) ) {
                 v = Dict.intValueOf( w, c );
                 String vs = Dict.valueOf( w, c );
                 boolean rs = false;
@@ -885,7 +849,7 @@ public class Glue {
                     //rs = (((v == 0) ? false : true) && ((Dict.intValueOf( w, "and" ) == 0) ? false : true));
                 }
                 if( w.containsKey( "or" ) ) {
-					rs = (Dict.boolValueOf( w, c ) || Dict.boolValueOf( w, "and" ));
+					rs = (Dict.boolValueOf( w, c ) || Dict.boolValueOf( w, "or" ));
                     //rs = (((v == 0) ? false : true) || ((Dict.intValueOf( w, "and" ) == 0) ? false : true));
                 }
                 if( c.equals( "testif" ) ) {
@@ -965,19 +929,13 @@ public class Glue {
                         echo( "[PLATFORM] setCurrentPathTo is unsupported" );
                         break;
 
+					case -797274927:			// platform.getrandomnumberfrom
+						Dict.setInto( vars, w, getRandomNumber( Dict.intValueOf( w, c ), Dict.intValueOf( w, "upto" ) ) );
+						break;
+
                     case 878174765:			// platform.loadconfigfrom
                     case -1218477053:		// platform.loadconfig
-                        return _loadConfig( Dict.rootValue( w ), Dict.valueOf( w, "withprefix", null ), vars );
-
-                    case -894351491:		// platform.stashvariables
-                    case -1903839430:		// platform.stash
-                        Dict.setInto( vars, w, saveVars( vars, Dict.rootValue( w ) ) );
-                        break;
-
-                    case 65466923:			// platform.unstashfrom
-                    case 1686258433:		// platform.unstash
-                        loadVars( vars, Dict.rootValue( w ), Dict.valueOf( w, "withprefix", null ) );
-                        break;
+                        return _loadConfig( Dict.rootValue( w ), w, vars );
 
                     case -21695619:			// platform.dateserial
                     case -2072040259:		// platform.getdateserial
@@ -1001,20 +959,20 @@ public class Glue {
 						Dict.setInto( vars, w, String.valueOf( (Dict.intValueOf( w, Dict.valueOf( w, c ) ) + ((int)Math.random() * Dict.intValueOf( w, "upto" ))) ) );
 						break;
 
-                    case 492362028:			// platform.exec
-						if( wc.equalsIgnoreCase( "browse" ) ) {
-							// built in support for browse:  The command argument is "browse" whilst "withArgs"
-							// must contain the URL to open
-							Uri webpage = Uri.parse( Dict.valueOf( w, "args", Dict.valueOf( w, "withargs" ) ) );
-							Intent intent = new Intent( Intent.ACTION_VIEW, webpage );
+					case 1124570528:		// platform.browseto
+						try {
+							Intent intent = new Intent( Intent.ACTION_VIEW, Uri.parse( wc ) );
 							// check the intent resolves to an activity then start it
 							if( (currentContext != null) && (intent.resolveActivity( currentContext.getPackageManager() ) != null) ) {
 								currentContext.startActivity( intent );
-								Glue.this.setRedirectLabel( Dict.valueOf( w, "ondonegoto" ) );
-							} else {
-								Glue.this.setRedirectLabel( Dict.valueOf( w, "onerrorgoto" ) );
 							}
-						} else if( Glue.this.executables != null ) {
+						} catch( Exception ex ) {
+							// nothing
+						}
+						return Glue.PLUGIN_DONE;		// it works or it doesn't, we will silently fail if needed
+
+					case 492362028:			// platform.exec
+						if( Glue.this.executables != null ) {
 							if( Glue.this.executables.containsKey( wc ) ) {
 								Executable e = Glue.this.executables.get( wc );
 								int rescode = e.exec(
@@ -1042,6 +1000,17 @@ public class Glue {
             return -1;
         }
 
+		/**
+		 * Get a random number
+		 * @param from minimum value
+		 * @param upto the upper bound is this -1
+		 * @return the number as a string
+		 */
+		private String getRandomNumber( int from, int upto ) {
+			int n = (int)(from + (Math.random() * (upto - from)));
+			return String.valueOf( n );
+		}
+
         private String _listFiles( String p ) {
             File path = FileManager.getInstance( null ).getRoot();
             if( (p != null) && (p.length() > 0) ) {
@@ -1058,11 +1027,11 @@ public class Glue {
         /**
          * Load an .ini style configuration file
          * @param c The filename
-         * @param prefix an optional prefix for the variables
+         * @param w the command arguments
          * @param vars the variables map to load into
          * @return "1" on success, "0" on error (and error is logged to console)
          */
-        private int _loadConfig( String c, String prefix, Map<String, String> vars ) {
+        private int _loadConfig( String c, Map<String, String> w, Map<String, String> vars ) {
 			Reader f = null;
 			if( currentContext != null ) {
 				try {
@@ -1075,21 +1044,24 @@ public class Glue {
 				try {
 					BufferedReader r = new BufferedReader( f );
 					String line, key = null;
-					StringBuilder value = new StringBuilder();
+					int b;
+					String value = "", prefix = "";
 					while( (line = r.readLine()) != null ) {
+						line = line.trim();
 						if( line.startsWith( "[" ) && line.endsWith( "]" ) ) {
-							if( key != null ) {
-								vars.put( ((prefix != null) ? (prefix + key) : key), value.toString().trim() );
+							prefix = (line.substring( 1, (line.length() - 1) ) + ".");
+						} else if( !line.startsWith( "#" ) ) {
+							b = line.indexOf( '=' );
+							if( b > -1 ) {
+								value = Glue._setPart(
+										value,
+										(prefix + line.substring( 0, b ).trim()),
+										line.substring( (b + 1) ).trim()
+									);
 							}
-							key = line.substring( 1, (line.length() - 1) );
-							value = new StringBuilder();
-						} else {
-							value.append( line ).append( "\n" );
 						}
 					}
-					if( key != null ) {
-						vars.put( ((prefix != null) ? (prefix + key) : key), value.toString().trim() );
-					}
+					Dict.setInto( vars, w, value );
 					return 1;
 				} catch( IOException ex ) {
 					_error( "[GLUE.PLATFORM] Unable to read from " + c );
@@ -1097,64 +1069,6 @@ public class Glue {
 				}
 			}
 			return 0;
-        }
-
-        private String saveVars( Map<String, String> vars, String names ) {
-            int i;
-            String s, k;
-            StringBuilder result = new StringBuilder();
-            while( (names != null) && (names.length() > 0) ) {
-                i = names.indexOf( ',' );
-                if( i > -1 ) {
-                    k = names.substring( 0, i );
-                    names = names.substring( (i + 1) );
-                } else {
-                    k = names;
-                    names = null;
-                }
-                s = k;
-                for( i = 0; i <= 1; i++ ) {
-                    int l = s.length();
-                    StringBuilder z = new StringBuilder();
-                    z.append( (char)(65 + (l & 15)) );
-                    while( l > 15 ) {
-                        l = (l >> 4);
-                        z.append( (char)(97 + (l & 15)) );
-                    }
-                    result.append( z.reverse() );
-                    result.append( s );
-                    s = Dict.valueOf( vars, k );
-                }
-            }
-            return result.toString();
-        }
-
-        private void loadVars( Map<String, String> vars, String from, String prefix ) {
-            int ofs = 0;
-            String k = null;
-
-            while( ofs < from.length() ) {
-                int l = 0;
-                int o = (int)from.charAt( ofs );
-                ofs += 1;
-                while( o >= 97 ) {
-                    l = (l + ((o - 97) << 4));
-                    o = (int)from.charAt( ofs );
-                    ofs += 1;
-                }
-                l += (o - 65);
-                o = ofs;
-                ofs += l;
-                if( k == null ) {
-                    k = from.substring( o, (o + l) );
-                    if( prefix != null ) {
-                        k = (prefix + k);
-                    }
-                } else {
-                    Dict.set( vars, k, from.substring( o, (o + l) ) );
-                    k = null;
-                }
-            }
         }
 
         /**
@@ -1222,6 +1136,7 @@ public class Glue {
 			if( currentContext != null ) {
 				try {
 					FileManager.getInstance( currentContext ).writeToFile( Dict.rootValue( w ), Dict.valueOf( w, "value" ) );
+					Dict.setInto( vars, w, "1" );
 					return 1;
 				} catch( IOException ex ) {
 					_error( "[GLUE.PLATFORM] Unable to write to " + Dict.rootValue( w ) );

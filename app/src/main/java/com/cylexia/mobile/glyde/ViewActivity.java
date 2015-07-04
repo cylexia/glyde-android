@@ -30,6 +30,7 @@ import com.cylexia.mobile.glyde.exe.HashCode;
 import com.cylexia.mobile.glyde.exe.UI;
 
 import com.cylexia.mobile.glyde.exe.Wget;
+import com.cylexia.mobile.lib.glue.LogOutputStream;
 
 
 public class ViewActivity extends AppCompatActivity {
@@ -133,6 +134,7 @@ public class ViewActivity extends AppCompatActivity {
 
 		// TODO: setup the Glue object
 		this.runtime = Glue.init( this );
+		runtime.setStdOut( LogOutputStream.getInstance( "stdout" ) );
 		this.ext_frontend = new ExtGlyde( FileManager.getInstance( this ) );
 		ext_frontend.setSize( 500, 500 );		// TODO: this will probably need all this to be moved to a view...
 		runtime.attachPlugin( ext_frontend );
@@ -143,7 +145,7 @@ public class ViewActivity extends AppCompatActivity {
 		runtime.addExecutable( "ui", new UI( this ) );
 		runtime.addExecutable( "wget", new Wget( this ) );
 		runtime.addExecutable( "hashcode", new HashCode() );
-		runtime.addExecutable( "gluetestrunner", new GlueTestRunner() );
+		runtime.addExecutable( "gluetestrunner", new GlueTestRunner( GlueTestRunner.GTR_EXE ) );
 		// -^- CUSTOMISE -^-
 
 		this.mainView = new GlydeView( this, ext_frontend );

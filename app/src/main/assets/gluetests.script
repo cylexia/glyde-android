@@ -7,6 +7,7 @@ stop
 :SHOW_UI
     f.clear "view"
     f.writeAs "core" x 5 y 5 width 490 height 30 value "core.test" onClickGoto :START linecolour "#00aa00"
+    f.writeAs "platform" x 5 y 40 width 490 height 30 value "platform.test" onClickGoto :START linecolour "#00aa00"
     return
 
 
@@ -17,11 +18,11 @@ stop
 
 :DONE
     gosub :SHOW_UI
-    f.writeAs 0 value "Done, check log" x 5 y 40
+    f.writeAs 0 value "Done, check log" x 5 y 400
     stop
 
 
 :FAIL
     gosub :SHOW_UI
-    f.writeAs 0 value "Failed" x 5 y 40
+    f.writeAs 0 value "Failed" x 5 y 400
     stop

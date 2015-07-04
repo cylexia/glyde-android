@@ -138,4 +138,7 @@
 #
 
   platform.browseTo "http://www.google.com"
-  
+
+
+  echo "\n--\n"
+  echo "\n\nDONE"
