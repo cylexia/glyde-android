@@ -8,6 +8,7 @@ import android.graphics.Rect;
 import android.util.Log;
 import android.view.KeyEvent;
 
+import com.cylexia.mobile.glyde.ViewActivity;
 import com.cylexia.mobile.lib.glue.FileManager;
 import com.cylexia.mobile.lib.glue.Glue;
 
@@ -16,6 +17,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import com.cylexia.mobile.glyde.VecText;
 
@@ -45,11 +48,18 @@ public class ExtGlyde implements Glue.Plugin {
 	private int window_width;
 	private int window_height;
 
-	private Paint background;
+	private Timer timer;
+	private String timer_label;
+	private int timer_interval;
 
-	public ExtGlyde(FileManager fm) {
+	private Paint background;
+	private ViewActivity activity;
+
+	public ExtGlyde( ViewActivity activity, FileManager fm) {
 		super();
+		this.activity = activity;
 		this.filemanager = fm;
+		this.timer_interval = -1;
 	}
 
 	public void setSize( int width, int height ) {
@@ -128,14 +138,15 @@ public class ExtGlyde implements Glue.Plugin {
 	 */
 	@Override
 	public int glueCommand( Glue glue, Map<String, String> w, Map<String, String> vars ) {
-		String cmd = w.get( "_" );
-		if( cmd.startsWith( "f." ) ) {
-			String wc = w.get( w.get( "_" ) );
-			cmd = cmd.substring( 2 );
+		String c = w.get( "_" );
+		if( c.startsWith( "f." ) ) {
+			String wc = w.get( c );
+			String cmd = c.substring( 2 );
 			if( cmd.equals( "setwidth" ) || cmd.equals( "setviewwidth" ) ) {
 				return setupView( w );
 			} else if( cmd.equals( "settitle" ) ) {
 				this.window_title = wc;
+				activity.setTitle( wc );
 				return 1;
 
 			} else if( cmd.equals( "doaction" ) ) {
@@ -164,6 +175,14 @@ public class ExtGlyde implements Glue.Plugin {
 				}
 				keys.put( wc, valueOf( w, "goto" ) );
 
+			} else if( cmd.equals( "starttimerwithinterval" ) ) {
+				startTimer( glue, intValueOf( w, c ), valueOf( w, "ontickgoto" ) );
+			} else if( cmd.equals( "stoptimer" ) ) {
+				if( this.timer != null ) {
+					timer.cancel();
+					this.timer = null;
+				}
+
 			} else if( cmd.equals( "drawas" ) ) {
 				drawAs( wc, w );
 
@@ -180,13 +199,29 @@ public class ExtGlyde implements Glue.Plugin {
 			} else if( cmd.equals( "paintfilledrectas" ) ) {
 				return paintRectAs( wc, w, true );
 
-				// TODO: rects and boxes (eg. filled rect)
+			} else if( cmd.equals( "exit" ) ) {
+				activity.finish();
+
 			} else {
 				return -1;
 			}
 			return 1;
 		}
 		return 0;
+	}
+
+	public void activityStart() {
+
+	}
+
+	public void activityStop() {
+		// should we suspend the timer?
+	}
+
+	public void activityDestroy() {
+		if( timer != null ) {
+			timer.cancel();
+		}
 	}
 
 	public String tryKeyAction( int keycode, KeyEvent event ) {
@@ -485,7 +520,7 @@ public class ExtGlyde implements Glue.Plugin {
 				intValueOf( args, "width" ),
 				intValueOf( args, "height" ),
 				args
-			);
+		);
 	}
 
 	private int paintRectAs( String id, Map<String, String> args, boolean filled ) {
@@ -543,6 +578,15 @@ public class ExtGlyde implements Glue.Plugin {
 				}
 			}
 		}
+	}
+
+	private void startTimer( Glue g, int interval, String label ) {
+		if( timer != null ) {
+			timer.cancel();
+		}
+		this.timer = new Timer();
+
+		timer.schedule( new IntervalTask( g, label ), (interval * 100), (interval * 100) );
 	}
 
 	private int loadResource( Glue g, String src, String id ) {
@@ -715,6 +759,36 @@ public class ExtGlyde implements Glue.Plugin {
 				}
 			}
 			return null;
+		}
+	}
+
+	/**
+	 * Runs a label on a timer
+	 */
+	private class IntervalTask extends TimerTask {
+		private Glue glue;
+		private String label;
+
+		/**
+		 * Creates a new {@code TimerTask}.
+		 */
+		protected IntervalTask( Glue g, String label ) {
+			super();
+			this.glue = g;
+			this.label = label;
+		}
+
+		/**
+		 * The task to run should be specified in the implementation of the {@code run()} method.
+		 */
+		@Override
+		public void run() {
+			// we're on a different thread, Glue needs to run on the UI thread:
+			ExtGlyde.this.activity.runOnUiThread( new Runnable() {
+				public void run() {
+					glue.run( label );
+				}
+			} );
 		}
 	}
 }

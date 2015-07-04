@@ -62,6 +62,7 @@ public class ViewActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView( R.layout.activity_view);
         FrameLayout l = (FrameLayout)findViewById( R.id.viewLayout );
+		setTitle( "Glyde" );
 
 		//l.setLayoutParams( new FrameLayout.LayoutParams( ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT ) );
 
@@ -135,7 +136,7 @@ public class ViewActivity extends AppCompatActivity {
 		// TODO: setup the Glue object
 		this.runtime = Glue.init( this );
 		runtime.setStdOut( LogOutputStream.getInstance( "stdout" ) );
-		this.ext_frontend = new ExtGlyde( FileManager.getInstance( this ) );
+		this.ext_frontend = new ExtGlyde( this, FileManager.getInstance( this ) );
 		ext_frontend.setSize( 500, 500 );		// TODO: this will probably need all this to be moved to a view...
 		runtime.attachPlugin( ext_frontend );
 
@@ -160,6 +161,18 @@ public class ViewActivity extends AppCompatActivity {
 			// orientation changes and such
 			runScriptAndSync( "" );
 		}
+	}
+
+	@Override
+	protected void onStart() {
+		super.onStart();
+		ext_frontend.activityStart();
+	}
+
+	@Override
+	protected void onStop() {
+		ext_frontend.activityStop();
+		super.onStop();
 	}
 
 	@Override
@@ -193,6 +206,7 @@ public class ViewActivity extends AppCompatActivity {
 
 	@Override
 	protected void onDestroy() {
+		ext_frontend.activityDestroy();
 		super.onDestroy();
 	}
 
@@ -214,12 +228,6 @@ public class ViewActivity extends AppCompatActivity {
 			repeat = false;
 			int result = runtime.run( label );
 			mainView.syncUI();
-			String t = ext_frontend.getWindowTitle();
-			if( (t != null) && !t.isEmpty() ) {
-				setTitle( t );
-			} else {
-				setTitle( "Glyde" );
-			}
 			switch( result ) {
 				case 1:
 					// nothing more to do

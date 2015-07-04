@@ -834,25 +834,30 @@ public class Glue {
                 boolean rs = false;
                 // string and int
                 if( w.containsKey( "==" ) ) rs = vs.equals( Dict.valueOf( w, "==" ) );
-                if( w.containsKey( "is" ) ) rs = vs.equals( Dict.valueOf( w, "is" ) );
-                if( w.containsKey( "!=" ) ) rs = !vs.equals( Dict.valueOf( w, "!=" ) );
-                if( w.containsKey( "isnot" ) ) rs = !vs.equals( Dict.valueOf( w, "isnot" ) );
-                if( w.containsKey( "<>" ) ) rs = !vs.equals( Dict.valueOf( w, "<>" ) );
+                else if( w.containsKey( "=" ) ) rs = vs.equals( Dict.valueOf( w, "=" ) );
+				else if( w.containsKey( "is" ) ) rs = vs.equals( Dict.valueOf( w, "is" ) );
+				else if( w.containsKey( "!=" ) ) rs = !vs.equals( Dict.valueOf( w, "!=" ) );
+				else if( w.containsKey( "isnot" ) ) rs = !vs.equals( Dict.valueOf( w, "isnot" ) );
+				else if( w.containsKey( "<>" ) ) rs = !vs.equals( Dict.valueOf( w, "<>" ) );
 
                 // int only
-                if( w.containsKey( "<" ) ) rs = (v < Dict.intValueOf( w, "<" ));			// int only
-                if( w.containsKey( ">" ) ) rs = (v > Dict.intValueOf( w, ">" ));
-                if( w.containsKey( "<=" ) ) rs = (v <= Dict.intValueOf( w, "<=" ));
-                if( w.containsKey( ">=" ) ) rs = (v >= Dict.intValueOf( w, ">=" ));
-                if( w.containsKey( "and" ) ) {
+				else if( w.containsKey( "<" ) ) rs = (v < Dict.intValueOf( w, "<" ));			// int only
+				else if( w.containsKey( ">" ) ) rs = (v > Dict.intValueOf( w, ">" ));
+				else if( w.containsKey( "<=" ) ) rs = (v <= Dict.intValueOf( w, "<=" ));
+				else if( w.containsKey( ">=" ) ) rs = (v >= Dict.intValueOf( w, ">=" ));
+				else if( w.containsKey( "lt" ) ) rs = (v < Dict.intValueOf( w, "lt" ));			// int only
+				else if( w.containsKey( "gt" ) ) rs = (v > Dict.intValueOf( w, "gt" ));
+				else if( w.containsKey( "lte" ) ) rs = (v <= Dict.intValueOf( w, "lte" ));
+				else if( w.containsKey( "gte" ) ) rs = (v >= Dict.intValueOf( w, "gte" ));
+				else if( w.containsKey( "and" ) ) {
 					rs = (Dict.boolValueOf( w, c ) && Dict.boolValueOf( w, "and" ));
                     //rs = (((v == 0) ? false : true) && ((Dict.intValueOf( w, "and" ) == 0) ? false : true));
                 }
-                if( w.containsKey( "or" ) ) {
+				else if( w.containsKey( "or" ) ) {
 					rs = (Dict.boolValueOf( w, c ) || Dict.boolValueOf( w, "or" ));
                     //rs = (((v == 0) ? false : true) || ((Dict.intValueOf( w, "and" ) == 0) ? false : true));
                 }
-                if( c.equals( "testif" ) ) {
+				if( c.equals( "testif" ) ) {
                     Dict.setInto( vars, w, (rs ? "1" : "0") );
                 } else {
                     Dict.setInto( vars, w, (rs ? "0" : "1") );
