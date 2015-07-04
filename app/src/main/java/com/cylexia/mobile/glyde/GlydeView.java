@@ -12,13 +12,13 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
 
-import com.cylexia.mobile.glyde.glue.ExtFrontEnd;
+import com.cylexia.mobile.glyde.glue.ExtGlyde;
 
 /**
  * Created by sparx104 on 20/04/2015.
  */
-public class FrontEndView extends ImageView implements View.OnClickListener {
-	private ExtFrontEnd ext;
+public class GlydeView extends ImageView implements View.OnClickListener {
+	private ExtGlyde ext;
 	private ViewActivity view;
 	private int focusIndex;
 
@@ -28,7 +28,7 @@ public class FrontEndView extends ImageView implements View.OnClickListener {
      * @param context The ViewActivity the view is running in, through which it can
      *                access the current theme, resources, etc. as well as callbacks for Glue events
      */
-    public FrontEndView( ViewActivity context, ExtFrontEnd e ) {
+    public GlydeView(ViewActivity context, ExtGlyde e) {
         super( context );
 		this.ext = e;
 		this.view = context;

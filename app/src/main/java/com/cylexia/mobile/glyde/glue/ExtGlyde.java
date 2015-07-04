@@ -1,6 +1,5 @@
 package com.cylexia.mobile.glyde.glue;
 
-import android.app.Application;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -8,8 +7,8 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.util.Log;
 import android.view.KeyEvent;
-import android.widget.Toast;
 
+import com.cylexia.mobile.glyde.ViewActivity;
 import com.cylexia.mobile.lib.glue.FileManager;
 import com.cylexia.mobile.lib.glue.Glue;
 
@@ -18,13 +17,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import com.cylexia.mobile.glyde.VecText;
 
 /**
  * Created by sparx104 on 27/04/2015.
  */
-public class ExtFrontEnd implements Glue.Plugin {
+public class ExtGlyde implements Glue.Plugin {
 	public static final int GLUE_STOP_ACTION = -200;
 
 	private final FileManager filemanager;
@@ -47,11 +48,18 @@ public class ExtFrontEnd implements Glue.Plugin {
 	private int window_width;
 	private int window_height;
 
-	private Paint background;
+	private Timer timer;
+	private String timer_label;
+	private int timer_interval;
 
-	public ExtFrontEnd( FileManager fm ) {
+	private Paint background;
+	private ViewActivity activity;
+
+	public ExtGlyde( ViewActivity activity, FileManager fm) {
 		super();
+		this.activity = activity;
 		this.filemanager = fm;
+		this.timer_interval = -1;
 	}
 
 	public void setSize( int width, int height ) {
@@ -130,14 +138,15 @@ public class ExtFrontEnd implements Glue.Plugin {
 	 */
 	@Override
 	public int glueCommand( Glue glue, Map<String, String> w, Map<String, String> vars ) {
-		String cmd = w.get( "_" );
-		if( cmd.startsWith( "f." ) ) {
-			String wc = w.get( w.get( "_" ) );
-			cmd = cmd.substring( 2 );
+		String c = w.get( "_" );
+		if( c.startsWith( "f." ) ) {
+			String wc = w.get( c );
+			String cmd = c.substring( 2 );
 			if( cmd.equals( "setwidth" ) || cmd.equals( "setviewwidth" ) ) {
 				return setupView( w );
 			} else if( cmd.equals( "settitle" ) ) {
 				this.window_title = wc;
+				activity.setTitle( wc );
 				return 1;
 
 			} else if( cmd.equals( "doaction" ) ) {
@@ -166,6 +175,14 @@ public class ExtFrontEnd implements Glue.Plugin {
 				}
 				keys.put( wc, valueOf( w, "goto" ) );
 
+			} else if( cmd.equals( "starttimerwithinterval" ) ) {
+				startTimer( glue, intValueOf( w, c ), valueOf( w, "ontickgoto" ) );
+			} else if( cmd.equals( "stoptimer" ) ) {
+				if( this.timer != null ) {
+					timer.cancel();
+					this.timer = null;
+				}
+
 			} else if( cmd.equals( "drawas" ) ) {
 				drawAs( wc, w );
 
@@ -182,13 +199,29 @@ public class ExtFrontEnd implements Glue.Plugin {
 			} else if( cmd.equals( "paintfilledrectas" ) ) {
 				return paintRectAs( wc, w, true );
 
-				// TODO: rects and boxes (eg. filled rect)
+			} else if( cmd.equals( "exit" ) ) {
+				activity.finish();
+
 			} else {
 				return -1;
 			}
 			return 1;
 		}
 		return 0;
+	}
+
+	public void activityStart() {
+
+	}
+
+	public void activityStop() {
+		// should we suspend the timer?
+	}
+
+	public void activityDestroy() {
+		if( timer != null ) {
+			timer.cancel();
+		}
 	}
 
 	public String tryKeyAction( int keycode, KeyEvent event ) {
@@ -341,7 +374,7 @@ public class ExtFrontEnd implements Glue.Plugin {
 		b.append( valueOf( w, "onerrorgoto", done_label ) ).append( "\t" );
 		b.append( valueOf( w, "onunsupportedgoto", done_label ) );
 		this.resume_label = b.toString();
-		return ExtFrontEnd.GLUE_STOP_ACTION;		// expects labels to be DONE|ERROR|UNSUPPORTED
+		return ExtGlyde.GLUE_STOP_ACTION;		// expects labels to be DONE|ERROR|UNSUPPORTED
 	}
 
 	private int createEntityAs( String id, Map<String, String> args ) {
@@ -487,7 +520,7 @@ public class ExtFrontEnd implements Glue.Plugin {
 				intValueOf( args, "width" ),
 				intValueOf( args, "height" ),
 				args
-			);
+		);
 	}
 
 	private int paintRectAs( String id, Map<String, String> args, boolean filled ) {
@@ -545,6 +578,15 @@ public class ExtFrontEnd implements Glue.Plugin {
 				}
 			}
 		}
+	}
+
+	private void startTimer( Glue g, int interval, String label ) {
+		if( timer != null ) {
+			timer.cancel();
+		}
+		this.timer = new Timer();
+
+		timer.schedule( new IntervalTask( g, label ), (interval * 100), (interval * 100) );
 	}
 
 	private int loadResource( Glue g, String src, String id ) {
@@ -717,6 +759,36 @@ public class ExtFrontEnd implements Glue.Plugin {
 				}
 			}
 			return null;
+		}
+	}
+
+	/**
+	 * Runs a label on a timer
+	 */
+	private class IntervalTask extends TimerTask {
+		private Glue glue;
+		private String label;
+
+		/**
+		 * Creates a new {@code TimerTask}.
+		 */
+		protected IntervalTask( Glue g, String label ) {
+			super();
+			this.glue = g;
+			this.label = label;
+		}
+
+		/**
+		 * The task to run should be specified in the implementation of the {@code run()} method.
+		 */
+		@Override
+		public void run() {
+			// we're on a different thread, Glue needs to run on the UI thread:
+			ExtGlyde.this.activity.runOnUiThread( new Runnable() {
+				public void run() {
+					glue.run( label );
+				}
+			} );
 		}
 	}
 }

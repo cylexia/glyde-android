@@ -1,5 +1,5 @@
 #internal applications;
 #;
 com.cylexia.g.hashcode=hashcode;
-#Simple Test App=test;
+gluetests=gluetests;
 

@@ -1,4 +1,4 @@
-package com.cylexia.mobile.glyde.glue;
+package com.cylexia.mobile.glyde.exe;
 
 import android.content.Context;
 
@@ -14,7 +14,7 @@ import java.util.Map;
 public class HashCode implements Glue.Executable {
 
 	@Override
-	public int exec(Context context, String name, String args, String label) {
+	public int exec( Glue glue, Context context, String name, String args, String label ) {
 		Map<String, String> a = FileManager.parseCommandLine( args );
 		String file = a.get( "o" );
 		String val = a.get( "_" );

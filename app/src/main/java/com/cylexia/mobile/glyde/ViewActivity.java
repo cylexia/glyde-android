@@ -17,6 +17,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.cylexia.mobile.glyde.exe.GlueTestRunner;
 import com.cylexia.mobile.lib.glue.FileManager;
 import com.cylexia.mobile.lib.glue.Glue;
 
@@ -24,12 +25,12 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.cylexia.mobile.glyde.glue.ExtFrontEnd;
-import com.cylexia.mobile.glyde.glue.HashCode;
-import com.cylexia.mobile.glyde.glue.UI;
+import com.cylexia.mobile.glyde.glue.ExtGlyde;
+import com.cylexia.mobile.glyde.exe.HashCode;
+import com.cylexia.mobile.glyde.exe.UI;
 
-import com.cylexia.mobile.glyde.R;
-import com.cylexia.mobile.glyde.glue.Wget;
+import com.cylexia.mobile.glyde.exe.Wget;
+import com.cylexia.mobile.lib.glue.LogOutputStream;
 
 
 public class ViewActivity extends AppCompatActivity {
@@ -38,11 +39,11 @@ public class ViewActivity extends AppCompatActivity {
 	public static final String STORE_ICON_NAME = "com.cylexia.iconname";
 
 	//private FrontEndView mainView;
-    private FrontEndView mainView;
+    private GlydeView mainView;
 	private String script;
 	private Map<String, String> variables;
 	private Glue runtime;
-	private ExtFrontEnd ext_frontend;
+	private ExtGlyde ext_frontend;
 	private int change_orientation;
 
 	private boolean wait_for_measure_and_start;
@@ -61,6 +62,7 @@ public class ViewActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView( R.layout.activity_view);
         FrameLayout l = (FrameLayout)findViewById( R.id.viewLayout );
+		setTitle( "Glyde" );
 
 		//l.setLayoutParams( new FrameLayout.LayoutParams( ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT ) );
 
@@ -133,7 +135,8 @@ public class ViewActivity extends AppCompatActivity {
 
 		// TODO: setup the Glue object
 		this.runtime = Glue.init( this );
-		this.ext_frontend = new ExtFrontEnd( FileManager.getInstance( this ) );
+		runtime.setStdOut( LogOutputStream.getInstance( "stdout" ) );
+		this.ext_frontend = new ExtGlyde( this, FileManager.getInstance( this ) );
 		ext_frontend.setSize( 500, 500 );		// TODO: this will probably need all this to be moved to a view...
 		runtime.attachPlugin( ext_frontend );
 
@@ -143,20 +146,33 @@ public class ViewActivity extends AppCompatActivity {
 		runtime.addExecutable( "ui", new UI( this ) );
 		runtime.addExecutable( "wget", new Wget( this ) );
 		runtime.addExecutable( "hashcode", new HashCode() );
+		runtime.addExecutable( "gluetestrunner", new GlueTestRunner( GlueTestRunner.GTR_EXE ) );
 		// -^- CUSTOMISE -^-
 
-		this.mainView = new FrontEndView( this, ext_frontend );
+		this.mainView = new GlydeView( this, ext_frontend );
 		l.addView( mainView );
 
 		// TODO: use a "launcher" screen to invoke this view so script will never be null as the launcher will provide one
 
 		if( (script != null) && !script.isEmpty() ) {
-			runtime.load( script );
+			runtime.load( script, variables );
 
 			// and run it.  it's up to the script to keep track of being restarted due to
 			// orientation changes and such
 			runScriptAndSync( "" );
 		}
+	}
+
+	@Override
+	protected void onStart() {
+		super.onStart();
+		ext_frontend.activityStart();
+	}
+
+	@Override
+	protected void onStop() {
+		ext_frontend.activityStop();
+		super.onStop();
 	}
 
 	@Override
@@ -190,6 +206,7 @@ public class ViewActivity extends AppCompatActivity {
 
 	@Override
 	protected void onDestroy() {
+		ext_frontend.activityDestroy();
 		super.onDestroy();
 	}
 
@@ -209,14 +226,8 @@ public class ViewActivity extends AppCompatActivity {
 		boolean repeat = true;
 		while( repeat ) {
 			repeat = false;
-			int result = runtime.run( variables, label );
+			int result = runtime.run( label );
 			mainView.syncUI();
-			String t = ext_frontend.getWindowTitle();
-			if( (t != null) && !t.isEmpty() ) {
-				setTitle( t );
-			} else {
-				setTitle( "Glyde" );
-			}
 			switch( result ) {
 				case 1:
 					// nothing more to do
@@ -225,7 +236,7 @@ public class ViewActivity extends AppCompatActivity {
 					Toast.makeText( this, ("Glue Error: " + runtime.getLastError()), Toast.LENGTH_SHORT ).show();
 					break;
 
-				case ExtFrontEnd.GLUE_STOP_ACTION:
+				case ExtGlyde.GLUE_STOP_ACTION:
 					label = doFrontEndAction();
 					if( label != null ) {
 						repeat = true;

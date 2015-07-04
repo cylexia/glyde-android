@@ -1,0 +1,28 @@
+f.setWidth 500 height 500
+f.setTitle "Hash Code"
+
+gosub :SHOW_UI
+stop
+
+:SHOW_UI
+    f.clear "view"
+    f.writeAs "core" x 5 y 5 width 490 height 30 value "core.test" onClickGoto :START linecolour "#00aa00"
+    f.writeAs "platform" x 5 y 40 width 490 height 30 value "platform.test" onClickGoto :START linecolour "#00aa00"
+    return
+
+
+:START
+    TEST = f.getLastActionId
+    platform.exec "gluetestrunner" withArgs TEST onDoneGoto :DONE onErrorGoto :FAIL
+    stop
+
+:DONE
+    gosub :SHOW_UI
+    f.writeAs 0 value "Done, check log" x 5 y 400
+    stop
+
+
+:FAIL
+    gosub :SHOW_UI
+    f.writeAs 0 value "Failed" x 5 y 400
+    stop
