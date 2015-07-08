@@ -55,6 +55,9 @@ public class ExtGlyde implements Glue.Plugin {
 	private Paint background;
 	private ViewActivity activity;
 
+	private int _offset_x;
+	private int _offset_y;
+
 	public ExtGlyde( ViewActivity activity, FileManager fm) {
 		super();
 		this.activity = activity;
@@ -148,9 +151,12 @@ public class ExtGlyde implements Glue.Plugin {
 				this.window_title = wc;
 				activity.setTitle( wc );
 				return 1;
+			} else if( cmd.equals( "setoffsetx" ) ) {
+				this._offset_x = intValueOf( w, c );
+				this._offset_y = intValueOf( w, "y", intValueOf( w, "aty" ) );
 
 			} else if( cmd.equals( "doaction" ) ) {
-				return doAction( wc, w );
+				return doAction( glue, wc, w );
 
 			} else if( cmd.equals( "clear" ) || cmd.equals( "clearview" ) ) {
 				clearUI();
@@ -163,13 +169,13 @@ public class ExtGlyde implements Glue.Plugin {
 					resources.remove( wc );
 				}
 
-			} else if( cmd.equals( "setstyle" ) ) {
-				setStyle( wc, w );
+			} else if( cmd.equals( "definestyle" ) ) {
+				defineStyle( wc, w );
 
 			} else if( cmd.equals( "getlastactionid" ) ) {
 				vars.put( valueOf( w, "into" ), last_action_id );
 
-			} else if( cmd.equals( "onkey" ) ) {
+			} else if( cmd.equals( "onkeypressed" ) ) {
 				if( keys == null ) {
 					keys = new HashMap<String, String>();
 				}
@@ -338,10 +344,11 @@ public class ExtGlyde implements Glue.Plugin {
 	 * @param name the name of the style
 	 * @param data the complete arguments string
 	 */
-	private void setStyle( String name, Map<String, String> data ) {
+	private void defineStyle(String name, Map<String, String> data) {
 		if( styles == null ) {
 			this.styles = new HashMap<String, Map<String, String>>();
 		}
+		applyStyle( data );
 		styles.put( name, data );
 	}
 
@@ -365,16 +372,30 @@ public class ExtGlyde implements Glue.Plugin {
 		setSize( window_width, window_height );
 	}
 
-	private int doAction( String action, Map<String, String> w ) {
+	private int doAction( Glue g, String action, Map<String, String> w ) {
 		this.action = action;
 		this.action_params = valueOf( w, "args", valueOf( w, "withargs" ) );
 		String done_label = valueOf( w, "ondonegoto" );
-		StringBuilder b = new StringBuilder();
-		b.append( done_label ).append( "\t" );
-		b.append( valueOf( w, "onerrorgoto", done_label ) ).append( "\t" );
-		b.append( valueOf( w, "onunsupportedgoto", done_label ) );
-		this.resume_label = b.toString();
-		return ExtGlyde.GLUE_STOP_ACTION;		// expects labels to be DONE|ERROR|UNSUPPORTED
+		// internal actions we can handle
+		if( action.equals( "chrome.hide" ) ) {
+			if( activity.getActionBar() != null ) {
+				activity.getActionBar().hide();
+			}
+		} else if( action.equals( "chrome.show" ) ) {
+			if( activity.getActionBar() != null ) {
+				activity.getActionBar().show();
+			}
+		} else {
+			// pass the action up to the activity to see if it can do it
+			StringBuilder b = new StringBuilder();
+			b.append( done_label ).append( "\t" );
+			b.append( valueOf( w, "onerrorgoto", done_label ) ).append( "\t" );
+			b.append( valueOf( w, "onunsupportedgoto", done_label ) );
+			this.resume_label = b.toString();
+			return ExtGlyde.GLUE_STOP_ACTION;        // expects labels to be DONE|ERROR|UNSUPPORTED
+		}
+		g.setRedirectLabel( done_label );
+		return Glue.PLUGIN_INLINE_REDIRECT;
 	}
 
 	private int createEntityAs( String id, Map<String, String> args ) {
@@ -444,8 +465,8 @@ public class ExtGlyde implements Glue.Plugin {
 
 		String text = valueOf( args, "value", "" );
 		if( text.length() > 0 ) {
-			x = rect.left;
-			y = rect.top;
+			x = (rect.left + _offset_x);
+			y = (rect.top + _offset_y);
 			rw = rect.width();
 			rh = rect.height();
 			int size = intValueOf( args, "size", 2 );
@@ -490,7 +511,13 @@ public class ExtGlyde implements Glue.Plugin {
 		} else {
 			p.setStyle( Paint.Style.STROKE );
 		}
-		plane.drawRect( r.left, r.top, r.right, r.bottom, p );
+		plane.drawRect(
+				(r.left + _offset_x),
+				(r.top + _offset_y),
+				(r.right + _offset_x),
+				(r.bottom + _offset_y),
+				p
+			);
 	}
 
 	private void error( String msg ) {
@@ -515,8 +542,8 @@ public class ExtGlyde implements Glue.Plugin {
 		applyStyle( args );
 		return buttonise(
 				id,
-				intValueOf( args, "x", intValueOf( args, "atx" ) ),
-				intValueOf( args, "y", intValueOf( args, "aty" ) ),
+				(intValueOf( args, "x", intValueOf( args, "atx" ) ) + _offset_x),
+				(intValueOf( args, "y", intValueOf( args, "aty" ) ) + _offset_y),
 				intValueOf( args, "width" ),
 				intValueOf( args, "height" ),
 				args
@@ -546,23 +573,19 @@ public class ExtGlyde implements Glue.Plugin {
 			plane.drawRect( x, y, (x + w), (y + h), p );
 		}
 		if( args.containsKey( "onclickgoto" ) ) {
-			return addButton( id, x, y, w, h, valueOf( args, "onclickgoto" ) );
+			if( buttons == null ) {
+				this.buttons = new HashMap<>();
+				this.button_sequence = new ArrayList<String>();
+			}
+			if( !buttons.containsKey( id ) ) {
+				buttons.put( id, new Button( x, y, w, h, valueOf( args, "onclickgoto" ) ) );
+				button_sequence.add( id );
+				return 1;
+			}
+			return 0;
 		} else {
 			return 1;
 		}
-	}
-
-	private int addButton( String id, int x, int y, int w, int h, String label ) {
-		if( buttons == null ) {
-			this.buttons = new HashMap<>();
-			this.button_sequence = new ArrayList<String>();
-		}
-		if( !buttons.containsKey( id ) ) {
-			buttons.put( id, new Button( x, y, w, h, label ) );
-			button_sequence.add( id );
-			return 1;
-		}
-		return 0;
 	}
 
 	private void applyStyle(Map<String, String> a) {
@@ -786,7 +809,7 @@ public class ExtGlyde implements Glue.Plugin {
 			// we're on a different thread, Glue needs to run on the UI thread:
 			ExtGlyde.this.activity.runOnUiThread( new Runnable() {
 				public void run() {
-					glue.run( label );
+					activity.runScriptAndSync( label );
 				}
 			} );
 		}
