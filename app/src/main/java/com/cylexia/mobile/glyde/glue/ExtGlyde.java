@@ -27,6 +27,8 @@ import com.cylexia.mobile.glyde.VecText;
  */
 public class ExtGlyde implements Glue.Plugin {
 	public static final int GLUE_STOP_ACTION = -200;
+	public static final String KEYDEF_USEID = "useid";
+	public static final String KEYDEF_LABEL = "label";
 
 	private final FileManager filemanager;
 
@@ -35,7 +37,7 @@ public class ExtGlyde implements Glue.Plugin {
 	private Map<String, ImageMap> resources;
 	private Map<String, Map<String, String>> styles;
 	private Map<String, Button> buttons;
-	private Map<String, String> keys;
+	private Map<String, Map<String, String>> keys;
 
 	private List<String> button_sequence;
 	private String action, action_params;
@@ -178,10 +180,7 @@ public class ExtGlyde implements Glue.Plugin {
 				vars.put( valueOf( w, "into" ), last_action_id );
 
 			} else if( cmd.equals( "onkeypressed" ) ) {
-				if( keys == null ) {
-					keys = new HashMap<String, String>();
-				}
-				keys.put( wc, valueOf( w, "goto" ) );
+				addKeyPressedHandler( wc, w );
 
 			} else if( cmd.equals( "starttimerwithinterval" ) ) {
 				startTimer( glue, intValueOf( w, c ), valueOf( w, "ontickgoto" ) );
@@ -259,7 +258,9 @@ public class ExtGlyde implements Glue.Plugin {
 				break;
 		}
 		if( keys.containsKey( keyname ) ) {
-			return keys.get( keyname );
+			Map<String, String> kdata = keys.get( keyname );
+			this.last_action_id = kdata.get( KEYDEF_USEID );
+			return kdata.get( KEYDEF_LABEL );
 		}
 		return null;
 	}
@@ -338,6 +339,25 @@ public class ExtGlyde implements Glue.Plugin {
 		} finally {
 			this.last_error_msg = null;
 		}
+	}
+
+	private void addKeyPressedHandler( String key, Map<String, String> data ) {
+		if( keys == null ) {
+			keys = new HashMap<String, Map<String, String>>();
+		}
+		if( key.equals( "##" ) ) {
+			key = "#";
+		} else if( (key.length() > 0) && key.startsWith( "#" ) ) {
+			try {
+				key = String.valueOf( (char)Integer.parseInt( key.substring( 1 ) ) );
+			} catch( NumberFormatException ex ) {
+				return;
+			}
+		}
+		Map<String, String> k = new HashMap<String, String>();
+		k.put( "id", valueOf( data, KEYDEF_USEID ) );
+		k.put( "label", valueOf( data, KEYDEF_LABEL ) );
+		keys.put( key, k );
 	}
 
 	/**
