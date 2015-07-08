@@ -41,7 +41,7 @@ public class UI implements Glue.Executable {
 		if( cmd == null ) {
 			return 0;
 		}
-		this.output_file = a.get( "file" );
+		this.output_file = a.get( "to" );
 		this.done_label = label;
 		if( cmd.equals( "ask" ) ) {
 			ask( context, a );
@@ -82,7 +82,7 @@ public class UI implements Glue.Executable {
 		try {
 			FileManager.getInstance( activity ).writeToFile( output_file, value );
 			activity.runScriptAndSync( done_label );
-		} catch( IOException ex ) {
+		} catch( Exception ex ) {
 			Toast.makeText( activity, ("Unable to write file: " + ex.toString()), Toast.LENGTH_SHORT ).show();
 			Log.e( "UI", ("saveValue: " + ex.toString()) );
 		}
