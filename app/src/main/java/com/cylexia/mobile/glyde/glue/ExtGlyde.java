@@ -160,6 +160,8 @@ public class ExtGlyde implements Glue.Plugin {
 
 			} else if( cmd.equals( "clear" ) || cmd.equals( "clearview" ) ) {
 				clearUI();
+			} else if( cmd.equals( "shade" ) || cmd.equals( "shadeview" ) ) {
+				shadeUI();
 
 			} else if( cmd.equals( "loadresource" ) ) {
 				return loadResource( glue, wc, valueOf( w, "as" ) );
@@ -370,6 +372,28 @@ public class ExtGlyde implements Glue.Plugin {
 		this.buttons = null;
 		this.keys = null;
 		setSize( window_width, window_height );
+	}
+
+	private void shadeUI() {
+		this.button_sequence = null;
+		this.buttons = null;
+		this.keys = null;
+
+		Paint p = new Paint();
+		p.setColor( Color.BLACK );
+		p.setStrokeWidth( 1 );
+
+		int i, e, s;
+		if( window_width > window_height ) {
+			e = (window_width * 2);
+			s = window_height;
+		} else {
+			e = (window_height * 2);
+			s = window_width;
+		}
+		for( i = 0; i <= e; i += 10 ) {
+			plane.drawLine( i, 0, (i - s), s, p );
+		}
 	}
 
 	private int doAction( Glue g, String action, Map<String, String> w ) {
