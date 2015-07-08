@@ -238,20 +238,20 @@ public class ExtGlyde implements Glue.Plugin {
 		String keyname;
 		switch( keycode ) {
 			case KeyEvent.KEYCODE_DPAD_UP:
-				keyname = "direction_up";
+				keyname = "$direction_up";
 				break;
 			case KeyEvent.KEYCODE_DPAD_LEFT:
-				keyname = "direction_left";
+				keyname = "$direction_left";
 				break;
 			case KeyEvent.KEYCODE_DPAD_DOWN:
-				keyname = "direction_down";
+				keyname = "$direction_down";
 				break;
 			case KeyEvent.KEYCODE_DPAD_RIGHT:
-				keyname = "direction_right";
+				keyname = "$direction_right";
 				break;
 			case KeyEvent.KEYCODE_DPAD_CENTER:
 			case KeyEvent.KEYCODE_BUTTON_A:
-				keyname = "direction_fire";
+				keyname = "$direction_fire";
 				break;
 			default:
 				keyname = String.valueOf( keycode );
