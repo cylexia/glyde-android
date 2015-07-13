@@ -140,19 +140,12 @@ public class ViewActivity extends AppCompatActivity {
 		ext_frontend.setSize( 500, 500 );		// TODO: this will probably need all this to be moved to a view...
 		runtime.attachPlugin( ext_frontend );
 
-		// attach executables
-		// -v- CUSTOMISE -v-
-		//  Add or remove entries here according to what your script(s) need
-		runtime.addExecutable( "ui", new UI( this ) );
-		runtime.addExecutable( "wget", new Wget( this ) );
-		runtime.addExecutable( "hashcode", new HashCode() );
-		runtime.addExecutable( "gluetestrunner", new GlueTestRunner( GlueTestRunner.GTR_EXE ) );
-		// -^- CUSTOMISE -^-
 
 		this.mainView = new GlydeView( this, ext_frontend );
 		l.addView( mainView );
 
-		// TODO: use a "launcher" screen to invoke this view so script will never be null as the launcher will provide one
+		// attach executables, now passed off into Configuration so everything's in one place
+		Configuration.attachExec( runtime, this, mainView );
 
 		if( (script != null) && !script.isEmpty() ) {
 			runtime.load( script, variables );
