@@ -210,6 +210,13 @@ public class ExtGlyde implements Glue.Plugin {
 				activity.finish();
 
 			} else {
+				if( cmd.endsWith( "as" ) ) {
+					cmd = cmd.substring( 0, (cmd.length() - 2) );
+					if( styles.containsKey( cmd ) ) {
+						w.put( "style", cmd );
+						return writeAs( wc, w );
+					}
+				}
 				return -1;
 			}
 			return 1;
